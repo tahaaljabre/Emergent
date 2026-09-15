@@ -14,10 +14,20 @@ function TabIcon({ symbol, focused, color }: { symbol: string; focused: boolean;
 
 export default function TabsLayout() {
   const { colors } = useTheme();
-  const { t } = useLang();
+  const { t, isRTL } = useLang();
+
+  const screens = [
+    { name: "dashboard", title: t("dashboard"), symbol: "▦" },
+    { name: "clients", title: t("clients"), symbol: "◉" },
+    { name: "employees", title: t("employees"), symbol: "◍" },
+    { name: "settings", title: t("settings"), symbol: "⚙" },
+  ];
+  // In Arabic the bar reads right-to-left: Dashboard on the far right, Settings on the far left.
+  const ordered = isRTL ? [...screens].reverse() : screens;
 
   return (
     <Tabs
+      initialRouteName="dashboard"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.brandPrimary,
@@ -32,34 +42,17 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
       }}
     >
-      <Tabs.Screen
-        name="dashboard"
-        options={{
-          title: t("dashboard"),
-          tabBarIcon: ({ focused, color }) => <TabIcon symbol="▦" focused={focused} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="clients"
-        options={{
-          title: t("clients"),
-          tabBarIcon: ({ focused, color }) => <TabIcon symbol="◉" focused={focused} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="employees"
-        options={{
-          title: t("employees"),
-          tabBarIcon: ({ focused, color }) => <TabIcon symbol="◍" focused={focused} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: t("settings"),
-          tabBarIcon: ({ focused, color }) => <TabIcon symbol="⚙" focused={focused} color={color} />,
-        }}
-      />
+      {ordered.map((s) => (
+        <Tabs.Screen
+          key={s.name}
+          name={s.name}
+          options={{
+            title: s.title,
+            tabBarButtonTestID: `tab-${s.name}`,
+            tabBarIcon: ({ focused, color }) => <TabIcon symbol={s.symbol} focused={focused} color={color} />,
+          }}
+        />
+      ))}
     </Tabs>
   );
 }

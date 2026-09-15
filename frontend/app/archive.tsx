@@ -5,10 +5,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useTheme, makeStyles } from "@/src/theme";
 import { useLang } from "@/src/i18n";
-import { listClients, listEmployees, archiveClient, archiveEmployee, deleteClient, deleteEmployee } from "@/src/api";
+import { listClients, listEmployees, archiveClient, archiveEmployee, deleteClient, deleteEmployee, listArchivedTransactions, archiveTransaction, deleteTransaction } from "@/src/api";
+import { kindLabelKey } from "@/src/components/share-cards";
 import { Badge, EmptyState, ScreenHeader, ConfirmSheet, ActionSheet } from "@/src/components/ui";
 
-type Tab = "clients" | "employees";
+type Tab = "clients" | "employees" | "transactions";
 
 export default function Archive() {
   const insets = useSafeAreaInsets();
@@ -24,15 +25,20 @@ export default function Archive() {
 
   const clientsQ = useQuery({ queryKey: ["archived-clients"], queryFn: () => listClients({ archived: true }), enabled: tab === "clients" });
   const empQ = useQuery({ queryKey: ["archived-employees"], queryFn: () => listEmployees({ archived: true }), enabled: tab === "employees" });
+  const txnQ = useQuery({ queryKey: ["archived-transactions"], queryFn: listArchivedTransactions, enabled: tab === "transactions" });
 
   const restoreClient = useMutation({ mutationFn: (id: string) => archiveClient(id, false), onSuccess: () => qc.invalidateQueries() });
   const restoreEmp = useMutation({ mutationFn: (id: string) => archiveEmployee(id, false), onSuccess: () => qc.invalidateQueries() });
   const delClient = useMutation({ mutationFn: (id: string) => deleteClient(id), onSuccess: () => qc.invalidateQueries() });
   const delEmp = useMutation({ mutationFn: (id: string) => deleteEmployee(id), onSuccess: () => qc.invalidateQueries() });
+  const restoreTxn = useMutation({ mutationFn: (id: string) => archiveTransaction(id, false), onSuccess: () => qc.invalidateQueries() });
+  const delTxn = useMutation({ mutationFn: (id: string) => deleteTransaction(id), onSuccess: () => qc.invalidateQueries() });
 
-  const items = tab === "clients" ? clientsQ.data ?? [] : empQ.data ?? [];
-  const refreshing = tab === "clients" ? clientsQ.isFetching : empQ.isFetching;
-  const refetch = tab === "clients" ? clientsQ.refetch : empQ.refetch;
+  const activeQ = tab === "clients" ? clientsQ : tab === "employees" ? empQ : txnQ;
+  const items: any[] = activeQ.data ?? [];
+  const refreshing = activeQ.isFetching;
+  const refetch = activeQ.refetch;
+  const kindTone = (k: string) => (k === "charge" ? colors.error : k === "receipt" ? colors.success : colors.warning);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
@@ -54,6 +60,9 @@ export default function Archive() {
           <Pressable testID="arch-tab-employees" onPress={() => setTab("employees")} style={[styles.seg, tab === "employees" && styles.segActive]}>
             <Text style={[styles.segText, tab === "employees" && styles.segTextActive]}>{t("employees_archive")}</Text>
           </Pressable>
+          <Pressable testID="arch-tab-transactions" onPress={() => setTab("transactions")} style={[styles.seg, tab === "transactions" && styles.segActive]}>
+            <Text style={[styles.segText, tab === "transactions" && styles.segTextActive]}>{t("transactions_archive")}</Text>
+          </Pressable>
         </View>
       </View>
       <ScrollView
@@ -67,16 +76,30 @@ export default function Archive() {
             <Pressable
               key={it.id}
               testID={`archived-${it.id}`}
-              onPress={() => setMenuFor({ id: it.id, name: it.name, type: tab })}
+              onPress={() => setMenuFor({ id: it.id, name: tab === "transactions" ? it.description : it.name, type: tab })}
               style={styles.card}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{it.name}</Text>
-                <Text style={styles.sub}>
-                  {tab === "clients" ? `${it.address ?? ""} · ${it.phone ?? ""}` : `${it.assignment ?? ""} · ${it.phone ?? ""}`}
-                </Text>
-              </View>
-              <Badge tone="info" label={t("archived")} />
+              {tab === "transactions" ? (
+                <>
+                  <View style={{ width: 4, alignSelf: "stretch", borderRadius: 2, backgroundColor: kindTone(it.kind) }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.name}>{it.description}</Text>
+                    <Text style={styles.sub}>{it.entity_name} · {new Date(it.date).toLocaleDateString()}</Text>
+                  </View>
+                  <Text style={{ color: kindTone(it.kind), fontWeight: "800", fontSize: 14 }}>{Math.round(it.amount).toLocaleString()}</Text>
+                  <Badge tone={it.kind === "charge" ? "error" : it.kind === "receipt" ? "success" : "warning"} label={t(kindLabelKey(it.kind))} />
+                </>
+              ) : (
+                <>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.name}>{it.name}</Text>
+                    <Text style={styles.sub}>
+                      {tab === "clients" ? `${it.address ?? ""} · ${it.phone ?? ""}` : `${it.assignment ?? ""} · ${it.phone ?? ""}`}
+                    </Text>
+                  </View>
+                  <Badge tone="info" label={t("archived")} />
+                </>
+              )}
             </Pressable>
           ))
         )}
@@ -101,13 +124,10 @@ export default function Archive() {
         cancelLabel={t("cancel")}
         onConfirm={() => {
           if (!confirm) return;
-          if (confirm.item.type === "clients") {
-            if (confirm.action === "delete") delClient.mutate(confirm.item.id);
-            else restoreClient.mutate(confirm.item.id);
-          } else {
-            if (confirm.action === "delete") delEmp.mutate(confirm.item.id);
-            else restoreEmp.mutate(confirm.item.id);
-          }
+          const del = confirm.action === "delete";
+          if (confirm.item.type === "clients") (del ? delClient : restoreClient).mutate(confirm.item.id);
+          else if (confirm.item.type === "employees") (del ? delEmp : restoreEmp).mutate(confirm.item.id);
+          else (del ? delTxn : restoreTxn).mutate(confirm.item.id);
           setConfirm(null);
           setMenuFor(null);
         }}

@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 3 verified end-to-end. Backend: 22/22 pytest tests pass on the public URL, covering transaction kinds {charge,receipt,disbursement} (payment kind rejected with 422), client sign math (charge +1 / receipt -1 / disbursement +1 → 750 for 1000/300/50) and employee sign math (charge +1 / disbursement -1 / receipt +1 → 330 for 500/200/30), PUT /api/transactions/{id} (updates description/amount/kind/date; 404 on unknown), POST /api/transactions/{id}/archive with archived:true (hidden from GET /transactions/{type}/{id} and appears in GET /api/transactions/archived with entity_name) and archived:false restore, DELETE hard-delete, seeded 6-month history for every non-archived client and employee (each has txns in ≥6 distinct months and no legacy 'payment' kind), and dashboard monthly/yearly_revenue > 0 with yearly ≥ monthly. Frontend (mobile viewport 390x844, public preview URL): Arabic tab bar reads left→right as tab-settings, tab-employees, tab-clients, tab-dashboard and the app opens on Dashboard. Statement rows render colored txn-kind-<id> pills (charge rgb(184,46,46) red, receipt rgb(40,124,73) green, disbursement orange); charge rows show ONLY txn-menu-edit + txn-menu-archive + action-cancel (voucher absent); receipt rows also show txn-menu-voucher. Tapping voucher opens SharePreview with preview-card containing 'توقيع العميل' and 'توقيع المسؤول'; preview-share-pdf increments window.print (0→1), preview-share-image increments HTMLAnchorElement click stub without crashing, preview-close closes. add-txn modal exposes kind-charge/kind-receipt/kind-disbursement, txn-desc, txn-amount, txn-date (prefilled 2026-09-15). Saving a charge does NOT prompt; saving a receipt shows ConfirmSheet (confirm-yes/confirm-cancel) and confirm-yes opens SharePreview. txn-menu-edit prefills the modal and after changing amount to 12345 the row updates to '+12,345'. txn-menu-archive shows ConfirmSheet before archiving: confirm-cancel keeps the row, confirm-yes removes it and it appears at /archive under arch-tab-transactions. stmt-share opens the period sheet with period-all/period-month/period-3m/period-from/period-to/period-custom-share; period-all opens SharePreview showing the entity name, 'المستحق'/'المسدد' columns and remaining-balance box. Reports /reports rep-share opens SharePreview and both preview-share-pdf (print 0→1) and preview-share-image work without crash. Archive /archive: arch-tab-transactions lists archived txns; tapping an item exposes arch-restore and arch-delete which each open a ConfirmSheet; restore returns the item to the statement. No red-screen or page errors observed. Minor UX quirk: after confirm-cancel on the archive/delete ConfirmSheet the parent ActionSheet re-appears (menuTx/menuFor is not cleared) — cosmetic only, not blocking.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "statement.tsx ConfirmSheet (archive)", "issue": "onCancel only clears archiveTx; the row ActionSheet (visible={!!menuTx && !archiveTx}) re-opens when the confirm is cancelled. Should also setMenuTx(null) inside onCancel. Reference: /app/frontend/app/statement.tsx:219", "testID": "confirm-cancel", "priority": "LOW"},
+      {"component": "archive.tsx ConfirmSheet (restore/delete)", "issue": "onCancel only clears confirm; the ActionSheet re-appears because menuFor is still set. Should setMenuFor(null) too. Reference: /app/frontend/app/archive.tsx:134", "testID": "confirm-cancel", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter3.py",
+    "/app/backend/tests/test_office_api.py",
+    "/app/backend/tests/test_renew.py",
+    "/app/test_reports/pytest/iter3_results.xml"
+  ],
+  "action_items": [
+    "(optional, cosmetic) In /app/frontend/app/statement.tsx line 219, also call setMenuTx(null) inside ConfirmSheet.onCancel so the row menu doesn't re-open after cancel.",
+    "(optional, cosmetic) In /app/frontend/app/archive.tsx line 134, also call setMenuFor(null) inside ConfirmSheet.onCancel."
+  ],
+  "critical_code_review_comments": [
+    "statement.tsx balanceAfter uses `i.id === tx.id` OR'd with a date filter — items sharing an equal timestamp created after tx still count. Pre-existing from iteration 2; edge-case only.",
+    "server.py archive/update transaction endpoints do not verify the id exists before update; update_one is silent, and only find_one afterwards returns 404. Works correctly (verified in test_update_transaction_404) but the same pattern in POST /transactions/{id}/archive can 200 for a non-existent id if a doc with that id does not exist — actually returns 404 because find_one is None. OK.",
+    "share-preview.tsx catches all errors with a generic Alert; consider logging so silent web failures (e.g. captureRef issues) are diagnosable."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_office_api.py (kind 'payment' -> 'receipt' in balance test to match iteration-3 validation)",
+    "/app/backend/tests/test_iter3.py (new)",
+    "/app/test_reports/iteration_3.json"
+  ],
+  "success_rate": {"backend": "100% (22/22 including 12 new iteration-3 tests)", "frontend": "100% on all iteration-3 flows"},
+  "seed_data_creation": "Two TEST_iter3 transactions were created via the UI during testing (one charge, one receipt) and cleaned up at the end via DELETE /api/transactions/{id}. Backend pytest fixtures create/delete their own TEST_iter3 client and employee.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All iteration-3 features are working against https://mobile-app-builder-3509.preview.emergentagent.com. Do not retest iterations 1-2 (CRUD/archive/upload/renew/dashboard banner). PDF share on web uses window.print — stub it (window.print = () => window.__printCount++) to observe increments on preview-share-pdf. preview-share-image on web produces an anchor download; stub HTMLAnchorElement.prototype.click to detect it. Seed transactions are lazily created on first startup only when db.transactions is empty; if the collection is wiped, restart backend to reseed. Kind pill testIDs are txn-kind-<id> with border+text colors driven from the theme (red/green/orange). The only non-blocking finding is that cancelling the archive/restore ConfirmSheet does not dismiss the parent ActionSheet.",
+  "rca_of_issue": "N/A — no bugs blocking the requested features. The two documented minor issues are UX-only (parent ActionSheet re-opens after ConfirmSheet.onCancel because the menu state isn't cleared alongside the confirm state)."
+}

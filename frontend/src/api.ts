@@ -26,7 +26,7 @@ export type Employee = {
   created_at: string;
 };
 
-export type TxnKind = "payment" | "charge";
+export type TxnKind = "charge" | "receipt" | "disbursement";
 export type Transaction = {
   id: string;
   entity_type: "client" | "employee";
@@ -37,6 +37,14 @@ export type Transaction = {
   date: string;
   archived: boolean;
   created_at: string;
+  entity_name?: string;
+};
+
+/** Balance effect of a transaction (mirrors backend txn_sign). */
+export const txnSign = (entity_type: "client" | "employee", kind: TxnKind) => {
+  if (kind === "charge") return 1;
+  if (entity_type === "client") return kind === "receipt" ? -1 : 1;
+  return kind === "disbursement" ? -1 : 1;
 };
 
 export type OfficeSettings = {
@@ -73,6 +81,8 @@ export const updateClient = (id: string, data: Partial<Client>) =>
 export const deleteClient = (id: string) => req<{ ok: boolean }>(`/clients/${id}`, { method: "DELETE" });
 export const archiveClient = (id: string, archived: boolean) =>
   req<Client>(`/clients/${id}/archive`, { method: "POST", body: JSON.stringify({ archived }) });
+export const renewClient = (id: string, months: number) =>
+  req<Client>(`/clients/${id}/renew`, { method: "POST", body: JSON.stringify({ months }) });
 
 // Employees
 export const listEmployees = (opts: { role?: ServiceType; archived?: boolean; q?: string } = {}) => {
@@ -97,6 +107,11 @@ export const listTransactions = (entity_type: "client" | "employee", entity_id: 
   req<{ items: Transaction[]; balance: number }>(`/transactions/${entity_type}/${entity_id}`);
 export const createTransaction = (data: Partial<Transaction>) =>
   req<Transaction>(`/transactions`, { method: "POST", body: JSON.stringify(data) });
+export const updateTransaction = (id: string, data: Partial<Transaction>) =>
+  req<Transaction>(`/transactions/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const archiveTransaction = (id: string, archived: boolean) =>
+  req<Transaction>(`/transactions/${id}/archive`, { method: "POST", body: JSON.stringify({ archived }) });
+export const listArchivedTransactions = () => req<Transaction[]>(`/transactions/archived`);
 export const deleteTransaction = (id: string) =>
   req<{ ok: boolean }>(`/transactions/${id}`, { method: "DELETE" });
 

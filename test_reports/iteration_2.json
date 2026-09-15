@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 2: fully validated the 4 new features (statement PDF sharing with period sheet, reports PDF share, per-payment receipt PDF with prompt after save, expiring-contracts dashboard banner + Renew ActionSheet). Backend: 8/8 pytest tests pass covering POST /api/clients/{id}/renew (months=6, months=12, extends from current contract_end when in future, starts today when already expired, 404 on unknown id, 422 on months=0 and months=61, persistence via GET) and dashboard.expiring behavior (new expiring client appears, removed after renew). Frontend (mobile viewport 390x844) exercised on the public preview URL: expiring banner shows count text and lists TEST_UI_expiring; renew-<id> opens ActionSheet with renew-6/renew-12/renew-edit/action-cancel; renew-12 hits the API, the card disappears, and the id is removed from dashboard.expiring. Reports rep-share triggers window.print (0→1). Statement stmt-share opens sheet with period-all/period-month/period-3m/period-from/period-to/period-custom-share; on an invalid from-date the custom-share button reports aria-disabled=true; tapping period-all closes the sheet and triggers print. Adding a payment transaction shows the ConfirmSheet (confirm-yes/confirm-cancel); cancel closes it; the payment row renders txn-receipt-<id> and tapping it triggers print. Adding a charge does NOT show the confirm sheet and the charge row has NO receipt button. No red-screen or console errors during the flows.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_renew.py",
+    "/app/backend/tests/test_office_api.py",
+    "/app/test_reports/pytest/renew_results.xml",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py renew endpoint uses fixed 30-day months. Acceptable per spec, but semantically a 12-month renewal = 360 days rather than a calendar year; document this in the UI or use relativedelta if calendar-accurate renewals are desired.",
+    "renew_client does not update contract_start/end atomically with a returned model — currently returns the raw Mongo doc after update. Works, but the response_model=ClientModel silently strips unknown fields; consider using ClientModel(**doc).dict() for consistency.",
+    "Frontend statement.tsx: on receipt generation the balance calculation filters items 'up to and including tx' using date + id fallback, but 'i.id === tx.id' is OR'd with a date filter, so items with an equal timestamp created after tx will still be included. Minor edge case only when several txns share the same second."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_renew.py",
+    "/app/test_reports/iteration_2.json"
+  ],
+  "success_rate": {"backend": "100% (8/8 new + 11/11 existing)", "frontend": "100%"},
+  "seed_data_creation": "Test-only clients TEST_UI_expiring and TEST_UI_stmt were created via the API for the frontend flow and deleted at the end of the run. Backend pytest fixtures also create/delete their own TEST_* clients.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All new iteration-2 features work end-to-end against https://mobile-app-builder-3509.preview.emergentagent.com. Backend renew endpoint validated at ±5s tolerance for 30-day months math. Frontend PDF share on web uses window.print (stubbed and observed to increment on each of: reports rep-share, statement period-all, txn-receipt-<id>). ConfirmSheet after a payment save works with confirm-yes/confirm-cancel testIDs; charge saves do not prompt. renew ActionSheet exposes renew-6, renew-12, renew-edit, action-cancel. Do not retest CRUD/archive/upload/select which were validated in iteration 1.",
+  "rca_of_issue": "N/A - no issues found."
+}

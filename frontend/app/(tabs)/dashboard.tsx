@@ -1,12 +1,12 @@
-import React from "react";
-import { View, Text, ScrollView, RefreshControl, Pressable, Image } from "react-native";
+import React, { useState } from "react";
+import { View, Text, ScrollView, RefreshControl, Pressable, Image, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useTheme, makeStyles } from "@/src/theme";
 import { useLang } from "@/src/i18n";
-import { getDashboard, getSettings, logoDisplayUrl } from "@/src/api";
-import { Badge, EmptyState } from "@/src/components/ui";
+import { getDashboard, getSettings, logoDisplayUrl, renewClient, type Client } from "@/src/api";
+import { Badge, EmptyState, ActionSheet } from "@/src/components/ui";
 
 export default function Dashboard() {
   const insets = useSafeAreaInsets();
@@ -14,6 +14,7 @@ export default function Dashboard() {
   const { t, isRTL } = useLang();
   const router = useRouter();
   const styles = useStyles();
+  const qc = useQueryClient();
 
   const dashQ = useQuery({ queryKey: ["dashboard"], queryFn: getDashboard });
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: getSettings });
@@ -22,6 +23,18 @@ export default function Dashboard() {
   const fmt = (n: number) => `${Math.round(n).toLocaleString()} ${currency}`;
 
   const d = dashQ.data;
+  const expiringCount = d?.expiring.length ?? 0;
+
+  const [renewTarget, setRenewTarget] = useState<Client | null>(null);
+  const renewMut = useMutation({
+    mutationFn: ({ id, months }: { id: string; months: number }) => renewClient(id, months),
+    onSuccess: (c) => {
+      qc.invalidateQueries();
+      setRenewTarget(null);
+      Alert.alert(t("renew_title"), `${t("renewed_until")} ${new Date(c.contract_end).toLocaleDateString()}`);
+    },
+    onError: () => Alert.alert(t("error")),
+  });
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
@@ -43,6 +56,16 @@ export default function Dashboard() {
             <Text style={styles.pageTitle}>{t("dashboard")}</Text>
           </View>
         </View>
+
+        {expiringCount > 0 && (
+          <View testID="expiring-banner" style={styles.banner}>
+            <Text style={{ fontSize: 20 }}>⚠️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.bannerTitle}>{expiringCount} {t("contracts_expiring_30")}</Text>
+              <Text style={styles.bannerSub}>{d!.expiring.map((c) => c.name).slice(0, 3).join("، ")}{expiringCount > 3 ? " …" : ""}</Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.kpiRow}>
           <View style={[styles.kpi, { backgroundColor: colors.brandPrimary }]} testID="kpi-contracts">
@@ -105,12 +128,34 @@ export default function Dashboard() {
                   <Text style={styles.expName}>{c.name}</Text>
                   <Text style={styles.expSub}>{t("contract_expires_in")} {days} {t("days")}</Text>
                 </View>
-                <Badge tone="warning" label={t("expiring_soon")} />
+                <Pressable testID={`renew-${c.id}`} onPress={() => setRenewTarget(c)} hitSlop={6} style={({ pressed }) => [styles.renewBtn, { opacity: pressed ? 0.8 : 1 }]}>
+                  <Text style={{ color: colors.onBrandPrimary, fontSize: 12, fontWeight: "700" }}>{t("renew")}</Text>
+                </Pressable>
               </Pressable>
             );
           })
         )}
       </ScrollView>
+
+      <ActionSheet
+        visible={!!renewTarget}
+        title={`${t("renew_title")} · ${renewTarget?.name ?? ""}`}
+        cancelLabel={t("cancel")}
+        onCancel={() => setRenewTarget(null)}
+        actions={[
+          { label: t("renew_6"), testID: "renew-6", onPress: () => renewTarget && renewMut.mutate({ id: renewTarget.id, months: 6 }) },
+          { label: t("renew_12"), testID: "renew-12", onPress: () => renewTarget && renewMut.mutate({ id: renewTarget.id, months: 12 }) },
+          {
+            label: t("edit_manually"),
+            testID: "renew-edit",
+            onPress: () => {
+              const id = renewTarget?.id;
+              setRenewTarget(null);
+              if (id) router.push({ pathname: "/client-form", params: { id } });
+            },
+          },
+        ]}
+      />
     </View>
   );
 }
@@ -151,4 +196,8 @@ const useStyles = makeStyles((c) => ({
   },
   expName: { color: c.onSurface, fontSize: 14, fontWeight: "700" },
   expSub: { color: c.muted, fontSize: 12, marginTop: 2 },
+  banner: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: c.warningBg, borderRadius: 16, padding: 14, marginBottom: 16 },
+  bannerTitle: { color: c.onWarningBg, fontSize: 14, fontWeight: "800" },
+  bannerSub: { color: c.onWarningBg, opacity: 0.85, fontSize: 12, marginTop: 2 },
+  renewBtn: { backgroundColor: c.brandPrimary, paddingHorizontal: 12, minHeight: 36, justifyContent: "center", borderRadius: 999 },
 }));

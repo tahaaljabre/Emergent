@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, ScrollView, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
@@ -6,7 +6,10 @@ import { useRouter } from "expo-router";
 import { useTheme, makeStyles } from "@/src/theme";
 import { useLang } from "@/src/i18n";
 import { getDashboard, getSettings } from "@/src/api";
+import { buildReportHtml } from "@/src/pdf";
 import { ScreenHeader } from "@/src/components/ui";
+import { SharePreview } from "@/src/components/share-preview";
+import { ReportCard } from "@/src/components/share-cards";
 
 export default function Reports() {
   const insets = useSafeAreaInsets();
@@ -21,6 +24,8 @@ export default function Reports() {
   const fmt = (n: number) => `${Math.round(n).toLocaleString()} ${currency}`;
   const d = dashQ.data;
 
+  const [preview, setPreview] = useState(false);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
       <View style={{ paddingTop: insets.top }}>
@@ -31,8 +36,18 @@ export default function Reports() {
               <Text style={{ color: colors.brandPrimary, fontSize: 22 }}>{isRTL ? "›" : "‹"}</Text>
             </Pressable>
           }
+          right={
+            <Pressable testID="rep-share" onPress={() => setPreview(true)} disabled={!d} hitSlop={10} style={styles.shareBtn}>
+              <Text style={{ color: colors.brandPrimary, fontWeight: "700", fontSize: 13 }}>{t("share")}</Text>
+            </Pressable>
+          }
         />
       </View>
+      {d && (
+        <SharePreview visible={preview} onClose={() => setPreview(false)} title={t("revenue_report")} buildHtml={() => buildReportHtml({ data: d, settings: settingsQ.data, t, isRTL })}>
+          <ReportCard data={d} settings={settingsQ.data} t={t} isRTL={isRTL} />
+        </SharePreview>
+      )}
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         <Text style={styles.section}>{t("total_revenue")}</Text>
         <View style={styles.grid}>
@@ -77,4 +92,5 @@ const useStyles = makeStyles((c) => ({
   row: { flexDirection: "row", justifyContent: "space-between", backgroundColor: c.surfaceSecondary, padding: 14, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: c.border },
   rowLabel: { color: c.onSurface, fontSize: 14, fontWeight: "600" },
   rowValue: { color: c.onSurface, fontSize: 14, fontWeight: "700" },
+  shareBtn: { minHeight: 44, minWidth: 44, justifyContent: "center", alignItems: "center", paddingHorizontal: 4 },
 }));

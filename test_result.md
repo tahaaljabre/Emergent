@@ -101,3 +101,14 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+## Iteration 2 — PDF sharing + date filter + receipts + contract renewal
+- Backend: POST /api/clients/{id}/renew {months} extends contract from max(today, current end)
+- Frontend: statement "Share PDF" opens period sheet (all / this month / last 3 months / custom YYYY-MM-DD); payment rows have "receipt" button; after saving a payment a ConfirmSheet offers to share receipt; Reports header "Share PDF"; Dashboard expiring banner + "renew" button per expiring card → ActionSheet (6 months / 1 year / edit manually)
+- Note: expo-print on web opens the browser print dialog (cannot be fully asserted); native share only on device
+
+## Iteration 3 — vouchers, edit/archive transactions, image share, seed history, RTL tab order
+- Transaction kinds are now: charge (استحقاق, red), receipt (سند قبض, green), disbursement (سند صرف, orange). Legacy "payment" migrated on startup.
+- Backend: PUT /api/transactions/{id}, POST /api/transactions/{id}/archive {archived}, GET /api/transactions/archived (with entity_name); GET /transactions/{type}/{id} excludes archived; balance uses txn_sign (client: charge+, receipt−, disbursement+; employee: charge+, disbursement−, receipt+). Dashboard revenue uses client receipts. Seed: 6 months of demo transactions for all clients/employees when the collection is empty.
+- Frontend statement: row tap → ActionSheet (print voucher [non-charge only], edit, archive→ConfirmSheet). Add/edit modal with 3 kind segments (kind-charge/kind-receipt/kind-disbursement), txn-desc, txn-amount, txn-date. Share → period sheet → SharePreview modal (preview-share-pdf / preview-share-image). Saving a new voucher prompts ConfirmSheet to print it.
+- Archive screen: new tab arch-tab-transactions (restore / delete with confirm).
+- Tabs: in Arabic the order is reversed (Settings … Dashboard) with initialRouteName dashboard; tabBarButtonTestID tab-<name>.

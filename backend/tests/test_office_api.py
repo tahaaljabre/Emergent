@@ -173,7 +173,7 @@ def test_transactions_balance_math(s):
     c = s.post(f"{API}/clients", json={"name": "TEST_txn_client", "service_type": "cleaning"}).json()
     cid = c["id"]
     s.post(f"{API}/transactions", json={"entity_type": "client", "entity_id": cid, "kind": "charge", "description": "c1", "amount": 1000})
-    s.post(f"{API}/transactions", json={"entity_type": "client", "entity_id": cid, "kind": "payment", "description": "p1", "amount": 300})
+    s.post(f"{API}/transactions", json={"entity_type": "client", "entity_id": cid, "kind": "receipt", "description": "p1", "amount": 300})
     r = s.get(f"{API}/transactions/client/{cid}")
     assert r.status_code == 200
     data = r.json()

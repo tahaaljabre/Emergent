@@ -68,7 +68,17 @@ app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
 ServiceType = Literal["cleaning", "security"]
-TxnKind = Literal["payment", "charge"]
+TxnKind = Literal["charge", "receipt", "disbursement"]
+# charge = استحقاق, receipt = سند قبض (money received by the office), disbursement = سند صرف (money paid out)
+
+
+def txn_sign(entity_type: str, kind: str) -> float:
+    """Balance effect. Client balance = owed to us; employee balance = owed by us."""
+    if kind == "charge":
+        return 1.0
+    if entity_type == "client":
+        return -1.0 if kind == "receipt" else 1.0
+    return -1.0 if kind == "disbursement" else 1.0
 
 
 def now_iso() -> str:
@@ -136,6 +146,13 @@ class TransactionIn(BaseModel):
     kind: TxnKind
     description: str
     amount: float
+    date: Optional[str] = None
+
+
+class TransactionUpdate(BaseModel):
+    kind: Optional[TxnKind] = None
+    description: Optional[str] = None
+    amount: Optional[float] = None
     date: Optional[str] = None
 
 
@@ -222,6 +239,32 @@ async def archive_client(cid: str, data: ArchiveIn):
     return doc
 
 
+class RenewIn(BaseModel):
+    months: int = Field(default=12, ge=1, le=60)
+
+
+@api_router.post("/clients/{cid}/renew", response_model=ClientModel)
+async def renew_client(cid: str, data: RenewIn):
+    """Extend the contract: new period starts at the later of today / current end date."""
+    doc = await db.clients.find_one({"id": cid}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Not found")
+    now = datetime.now(timezone.utc)
+    try:
+        current_end = datetime.fromisoformat(doc["contract_end"].replace("Z", "+00:00"))
+        if current_end.tzinfo is None:
+            current_end = current_end.replace(tzinfo=timezone.utc)
+    except Exception:
+        current_end = now
+    start = max(now, current_end)
+    end = start + timedelta(days=30 * data.months)
+    await db.clients.update_one(
+        {"id": cid},
+        {"$set": {"contract_start": start.isoformat(), "contract_end": end.isoformat()}},
+    )
+    return await db.clients.find_one({"id": cid}, {"_id": 0})
+
+
 # ---------- Employee routes ----------
 @api_router.get("/employees", response_model=List[EmployeeModel])
 async def get_employees(
@@ -286,18 +329,25 @@ async def archive_employee(eid: str, data: ArchiveIn):
 
 
 # ---------- Transactions ----------
+@api_router.get("/transactions/archived")
+async def get_archived_transactions():
+    docs = await db.transactions.find({"archived": True}, {"_id": 0}).sort("date", -1).to_list(1000)
+    names = {}
+    for coll, et in ((db.clients, "client"), (db.employees, "employee")):
+        async for d in coll.find({}, {"_id": 0, "id": 1, "name": 1}):
+            names[(et, d["id"])] = d["name"]
+    for d in docs:
+        d["entity_name"] = names.get((d["entity_type"], d["entity_id"]), "—")
+    return docs
+
+
 @api_router.get("/transactions/{entity_type}/{entity_id}")
 async def get_transactions(entity_type: str, entity_id: str):
     docs = await db.transactions.find(
         {"entity_type": entity_type, "entity_id": entity_id, "archived": False},
         {"_id": 0},
     ).sort("date", -1).to_list(1000)
-    balance = 0.0
-    for d in docs:
-        if d["kind"] == "charge":
-            balance += float(d["amount"])
-        else:
-            balance -= float(d["amount"])
+    balance = sum(txn_sign(entity_type, d["kind"]) * float(d["amount"]) for d in docs)
     return {"items": docs, "balance": balance}
 
 
@@ -309,6 +359,26 @@ async def create_transaction(data: TransactionIn):
     obj = TransactionModel(**payload)
     await db.transactions.insert_one(obj.dict().copy())
     return obj
+
+
+@api_router.put("/transactions/{tid}", response_model=TransactionModel)
+async def update_transaction(tid: str, data: TransactionUpdate):
+    update = {k: v for k, v in data.dict(exclude_unset=True).items() if v is not None}
+    if update:
+        await db.transactions.update_one({"id": tid}, {"$set": update})
+    doc = await db.transactions.find_one({"id": tid}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Not found")
+    return doc
+
+
+@api_router.post("/transactions/{tid}/archive", response_model=TransactionModel)
+async def archive_transaction(tid: str, data: ArchiveIn):
+    await db.transactions.update_one({"id": tid}, {"$set": {"archived": data.archived}})
+    doc = await db.transactions.find_one({"id": tid}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Not found")
+    return doc
 
 
 @api_router.delete("/transactions/{tid}")
@@ -339,7 +409,7 @@ async def dashboard():
     expiring.sort(key=lambda x: x["contract_end"])
 
     # Monthly and yearly revenue from transactions
-    txns = await db.transactions.find({"archived": False, "kind": "payment", "entity_type": "client"}, {"_id": 0}).to_list(5000)
+    txns = await db.transactions.find({"archived": False, "kind": "receipt", "entity_type": "client"}, {"_id": 0}).to_list(5000)
     monthly = 0.0
     yearly = 0.0
     for t in txns:
@@ -519,6 +589,63 @@ async def seed():
     if await db.settings.count_documents({"_id": "office"}) == 0:
         base = OfficeSettingsModel().dict()
         await db.settings.insert_one({"_id": "office", **base})
+
+    # legacy kind "payment" -> receipt (client) / disbursement (employee)
+    await db.transactions.update_many({"kind": "payment", "entity_type": "client"}, {"$set": {"kind": "receipt"}})
+    await db.transactions.update_many({"kind": "payment", "entity_type": "employee"}, {"$set": {"kind": "disbursement"}})
+
+    if await db.transactions.count_documents({}) == 0:
+        await seed_transactions()
+
+
+def _months_ago(n: int, day: int) -> datetime:
+    now = datetime.now(timezone.utc)
+    y, m = now.year, now.month - n
+    while m <= 0:
+        y, m = y - 1, m + 12
+    return datetime(y, m, min(day, 28), 10, 0, tzinfo=timezone.utc)
+
+
+AR_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+
+
+async def seed_transactions():
+    """Demo history: 6 months of monthly charges + payments for every client and employee."""
+    docs = []
+    clients = await db.clients.find({"archived": False}, {"_id": 0}).to_list(100)
+    employees = await db.employees.find({"archived": False}, {"_id": 0}).to_list(100)
+    for idx, c in enumerate(clients):
+        for n in range(6, 0, -1):
+            charge_dt = _months_ago(n, 1)
+            month_name = f"{AR_MONTHS[charge_dt.month - 1]} {charge_dt.year}"
+            amount = float(c["contract_amount"])
+            docs.append(TransactionModel(entity_type="client", entity_id=c["id"], kind="charge",
+                                         description=f"اشتراك شهر {month_name}", amount=amount,
+                                         date=charge_dt.isoformat()).dict())
+            # every 3rd month of some clients stays partially unpaid to make balances interesting
+            partial = (idx + n) % 4 == 0
+            pay_amount = round(amount * 0.5, 2) if partial else amount
+            docs.append(TransactionModel(entity_type="client", entity_id=c["id"], kind="receipt",
+                                         description=f"دفعة {'جزئية ' if partial else ''}شهر {month_name}", amount=pay_amount,
+                                         date=_months_ago(n, 5 + idx).isoformat()).dict())
+    for idx, e in enumerate(employees):
+        for n in range(6, 0, -1):
+            dt = _months_ago(n, 27)
+            month_name = f"{AR_MONTHS[dt.month - 1]} {dt.year}"
+            salary = float(e["salary"])
+            docs.append(TransactionModel(entity_type="employee", entity_id=e["id"], kind="charge",
+                                         description=f"راتب شهر {month_name}", amount=salary,
+                                         date=dt.isoformat()).dict())
+            if (idx + n) % 5 == 0:
+                docs.append(TransactionModel(entity_type="employee", entity_id=e["id"], kind="charge",
+                                             description="بدل ساعات إضافية", amount=round(salary * 0.1, 2),
+                                             date=_months_ago(n, 26).isoformat()).dict())
+            docs.append(TransactionModel(entity_type="employee", entity_id=e["id"], kind="disbursement",
+                                         description=f"صرف راتب {month_name}", amount=salary,
+                                         date=_months_ago(n, 28).isoformat()).dict())
+    if docs:
+        await db.transactions.insert_many([d.copy() for d in docs])
+        logger.info("Seeded %d demo transactions", len(docs))
 
 
 @app.on_event("shutdown")
