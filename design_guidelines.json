@@ -1,0 +1,171 @@
+{
+  "app_name": "Office Services Manager (KSA)",
+  "personality": "1 iOS-Native Clean",
+  "personality_one_liner": "A highly structured, professional management command center rooted in iOS-native clarity, providing trustworthy, high-contrast visibility into contracts and office operations.",
+  "color": {
+    "surface": "#FFFFFF",
+    "onSurface": "#11181C",
+    "surfaceSecondary": "#F4F5F7",
+    "onSurfaceSecondary": "#11181C",
+    "surfaceTertiary": "#E9ECEF",
+    "onSurfaceTertiary": "#495057",
+    "surfaceInverse": "#11181C",
+    "onSurfaceInverse": "#FFFFFF",
+    "brand": "#1F4A38",
+    "onBrand": "#FFFFFF",
+    "brandPrimary": "#1F4A38",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#4A7862",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#D8E8E0",
+    "onBrandTertiary": "#1F4A38",
+    "success": "#287C49",
+    "onSuccess": "#FFFFFF",
+    "warning": "#C26510",
+    "onWarning": "#FFFFFF",
+    "error": "#B82E2E",
+    "onError": "#FFFFFF",
+    "info": "#4A5568",
+    "onInfo": "#FFFFFF",
+    "border": "#E4E7EB",
+    "borderStrong": "#C1C7D0",
+    "divider": "#F0F2F5",
+    "muted": "#687076"
+  },
+  "typography": {
+    "displayFontFamily": "IBM Plex Sans Arabic",
+    "textFontFamily": "IBM Plex Sans Arabic",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Maintain iOS-native generous breathing room. Use logical properties (paddingStart, marginEnd) instead of physical (paddingLeft) to support RTL automatically. Never leave orphan elements in grids.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": "true",
+    "do's": [
+      "Use blur on bottom tab bar when content scrolls behind it",
+      "Use blur on sticky headers over scrolling content",
+      "Use blur for floating action buttons (FAB) over brandTertiary tint",
+      "Add a frosted overlay on the client profile cover banner"
+    ],
+    "dont's": [
+      "Never apply glass to standard list rows, form inputs, or standard cards",
+      "Avoid stacking more than 2 glass surfaces on screen at once"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Dashboard",
+      "purpose": "High-level command center showing KPIs and urgently expiring contracts.",
+      "states": {
+        "loading": "Skeleton loaders for KPI cards, spinner for list",
+        "empty": "N/A - KPIs show 0, empty state illustration for expiring contracts list",
+        "error": "Card showing 'Failed to load data' with a 'Retry' button"
+      },
+      "layout": "Header with office logo/greeting -> 2-col Grid for KPI cards (Total Contracts, Subscriptions, Revenue) -> 'Expiring Soon' section header -> Vertical list of Client Cards (with orange warning badges). FAB at bottom to quickly Add Contract."
+    },
+    {
+      "name": "Clients (Contracts Index)",
+      "purpose": "Unified list of all clients, split by Cleaning vs. Security.",
+      "states": {
+        "loading": "Skeleton list rows",
+        "empty": "Illustration + 'No clients found' + 'Add Client' primary CTA",
+        "error": "Readable error message + Retry button"
+      },
+      "layout": "Sticky Header with Search/Filter bar -> Segmented Control (Cleaning | Security) -> Vertical scrolling list of Client Cards (Status Badge, Name, Next Renewal Date). Bottom sticky CTA or FAB to add a new client."
+    },
+    {
+      "name": "Account Statement (Client Details)",
+      "purpose": "Detailed view of a client/employee, their balance, and transaction history.",
+      "states": {
+        "loading": "Spinner in the center",
+        "empty": "Cover loaded, but empty state for transaction list",
+        "error": "Retry button full screen"
+      },
+      "layout": "Cover image (abstract building) with gradient scrim -> Overlaid Client Info (Logo/Initials, Name, Status) -> Balance & Revenue Summary Card -> 'Transactions' section header -> Vertical list of payments/invoices. Floating action button to 'Export PDF'."
+    },
+    {
+      "name": "Employees",
+      "purpose": "Directory of staff grouped by their role.",
+      "states": {
+        "loading": "Skeleton list rows",
+        "empty": "Illustration + 'No employees added' + CTA",
+        "error": "Readable error message + Retry button"
+      },
+      "layout": "Search bar -> Vertical list of Employee Cards. Each card has an Avatar, Name, and Role Tag (Cleaning/Security) in brandTertiary. FAB to Add Employee."
+    },
+    {
+      "name": "Settings",
+      "purpose": "Configuration, reporting, and archiving hub.",
+      "states": {
+        "loading": "Spinner",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "Vertical list grouped by sections: 'Office Info', 'Management' (Archive, Reports, Backup), 'Preferences' (Language, Theme). Use tinted icon containers (brandTertiary rounded squares) for each setting row's leading icon."
+    }
+  ],
+  "images": {
+    "dashboard_hero": {
+      "url": "https://images.unsplash.com/photo-1488972685288-c3fd157d7c7a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBvZmZpY2UlMjBidWlsZGluZyUyMGZhY2FkZSUyMGFic3RyYWN0fGVufDB8fHx8MTc4OTQ1NzcyMnww&ixlib=rb-4.1.0&q=85",
+      "dark": "https://images.unsplash.com/photo-1470075801209-17f9ec0cada6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBvZmZpY2UlMjBidWlsZGluZyUyMGZhY2FkZSUyMGFic3RyYWN0fGVufDB8fHx8MTc4OTQ1NzcyMnww&ixlib=rb-4.1.0&q=85",
+      "alt": "Modern abstract office building facade"
+    },
+    "empty_archive": {
+      "url": "https://images.unsplash.com/photo-1589362281138-e3f7ebe47f1a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzF8MHwxfHNlYXJjaHwxfHxjbGVhbiUyMG1pbmltYWxpc3QlMjBkZXNrJTIwd29ya3NwYWNlfGVufDB8fHx8MTc4OTQ1NzcyMXww&ixlib=rb-4.1.0&q=85",
+      "alt": "Clean minimalist desk workspace"
+    }
+  },
+  "instructions_to_main_agent": [
+    "RTL FIRST: Arabic is the primary language. Use React Native's I18nManager and ALWAYS use logical properties (marginStart, paddingEnd, alignItems: 'flex-start' which maps to right in RTL).",
+    "DARK MODE INVERSION: For dark mode, map surface to #121212, surfaceSecondary to #1E1E1E, and surfaceInverse to #EFEFEF. Ensure text contrasts are WCAG compliant.",
+    "NO BLUE/PURPLE: We are strictly using Moss Green (#1F4A38) as the brand identity. Success is #287C49, Warning is #C26510, Info is #4A5568. Do not use blue or indigo anywhere.",
+    "TYPOGRAPHY: 'IBM Plex Sans Arabic' is chosen as it perfectly handles both Arabic and English characters in a modern, clean geometry. Ensure it is loaded via Expo Google Fonts.",
+    "NAVIGATION: Use 4 bottom tabs (Dashboard, Clients, Employees, Settings). Do not exceed 4 tabs. Combine Cleaning/Security under 'Clients' using a top segmented control.",
+    "STATUS BADGES: heavily use color-coded chips for status (Active=Success, Expiring=Warning, Expired=Error). Place them prominently on the client/contract cards.",
+    "IMAGES WITH TEXT: Any text rendered on top of the dashboard_hero or cover images must use a vertical gradient scrim (transparent to >=70% surfaceInverse) to guarantee contrast.",
+    "HAPTICS: Add subtle haptic feedback to the Segmented Controls (Cleaning/Security), FAB taps, and Save/Delete actions."
+  ],
+  "haptics": {
+    "tab_press": "light",
+    "button_primary": "medium",
+    "segmented_control": "light",
+    "success_action": "success",
+    "error_action": "error",
+    "delete_warning": "warning"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "summary": "Backend + frontend tested end-to-end for Office Services (Arabic RTL). All 11 pytest tests passed (100%): health, dashboard KPIs, clients/employees CRUD + archive + delete cascade, transactions balance math (charge adds, payment subtracts), settings GET/PUT, backup dump. Verified _id is never returned. Seed data present (6 clients, 5 employees). Frontend: Dashboard renders KPIs and expiring contracts, navigation to services works, Clients screen with segmented cleaning/security tabs, search, list, FAB add flow (created & verified TEST_UI_Client), three-dot menu → ActionSheet (edit/archive/delete) → ConfirmSheet works, delete removed the client. Statement screen shows balance and add-txn. Employees tab shows 5 seeded employees. Settings screen exposes office fields, theme (light/dark/system), language (ar/en), archive, reports, backup buttons. Archive and Reports screens navigate correctly.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_office_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py: PUT /clients and /employees use dict(exclude_unset=True) with a None filter; ClientIn/EmployeeIn defaults may still update fields silently. Consider requiring explicit partial update model.",
+    "Frontend api.ts: no request timeout / retry configured on fetch; user network hiccups will show as generic 'HTTP xxx' errors.",
+    "Dashboard fmt uses Math.round without decimals; acceptable for SAR display but note if fractional currency needed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_office_api.py"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Seed data auto-created by backend startup hook (6 Arabic clients, 5 employees). Test-created client TEST_UI_Client was deleted at end of UI test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 11 backend pytest tests in /app/backend/tests/test_office_api.py pass against EXPO_PUBLIC_BACKEND_URL. UI verified with mobile viewport (390x844): dashboard, clients (cleaning/security segments, search, FAB, menu actions), client-form, statement, employees, settings, archive, reports.",
+  "rca_of_issue": "N/A - no issues found."
+}
