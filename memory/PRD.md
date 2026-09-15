@@ -10,7 +10,7 @@ Mobile app to run a security & cleaning services office. Track contracts, client
 - Dashboard: KPIs, service breakdown, expiring contracts (auto-flagged within 30 days)
 - Clients: Cleaning/Security segmented, search, CRUD, archive
 - Employees: Search, CRUD, archive
-- Statement: Client/employee statement with add/delete transactions and running balance
+- Statement: Client/employee statement with add/delete transactions and running balance; "Share PDF" button builds a branded PDF (office logo/name, totals, transaction table) via expo-print and opens the native share sheet (WhatsApp/Email) via expo-sharing (web: print dialog)
 - Settings: Office info, Archive, Reports, Backup, Theme (Light/Dark/System), Language (AR/EN)
 - Archive: Restore or hard-delete archived clients/employees
 - Reports: Monthly/Yearly revenue and by-service breakdown

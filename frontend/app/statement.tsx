@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { View, Text, ScrollView, Pressable, Modal, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, ScrollView, Pressable, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useTheme, makeStyles } from "@/src/theme";
 import { useLang } from "@/src/i18n";
 import { getClient, getEmployee, getSettings, listTransactions, createTransaction, deleteTransaction, type TxnKind } from "@/src/api";
+import { shareStatementPdf } from "@/src/pdf";
 import { EmptyState, ScreenHeader, Field, PrimaryButton, SecondaryButton, Badge } from "@/src/components/ui";
 
 export default function Statement() {
@@ -55,6 +56,31 @@ export default function Statement() {
   const entity: any = entityQ.data;
   const items = txnQ.data?.items ?? [];
   const balance = txnQ.data?.balance ?? 0;
+  const isSecurity = params.type === "client" ? entity?.service_type === "security" : entity?.role === "security";
+  const serviceLabel = isSecurity ? t("security_short") : t("cleaning");
+
+  const [sharing, setSharing] = useState(false);
+  const onShare = async () => {
+    if (!entity || sharing) return;
+    setSharing(true);
+    try {
+      await shareStatementPdf({
+        entity,
+        entityType: params.type,
+        items,
+        balance,
+        settings: settingsQ.data,
+        t,
+        isRTL,
+        serviceLabel,
+        fileName: `${t("statement")} - ${entity.name}`,
+      });
+    } catch {
+      Alert.alert(t("pdf_error"));
+    } finally {
+      setSharing(false);
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
@@ -64,6 +90,15 @@ export default function Statement() {
           left={
             <Pressable testID="stmt-back" onPress={() => router.back()} hitSlop={10}>
               <Text style={{ color: colors.brandPrimary, fontSize: 22 }}>{isRTL ? "›" : "‹"}</Text>
+            </Pressable>
+          }
+          right={
+            <Pressable testID="stmt-share" onPress={onShare} disabled={!entity || sharing} hitSlop={10} style={styles.shareBtn}>
+              {sharing ? (
+                <ActivityIndicator size="small" color={colors.brandPrimary} />
+              ) : (
+                <Text style={{ color: colors.brandPrimary, fontWeight: "700", fontSize: 13 }}>{t("share_pdf")}</Text>
+              )}
             </Pressable>
           }
         />
@@ -78,12 +113,7 @@ export default function Statement() {
               <Text style={styles.entitySub}>{entity.assignment || "—"} · {entity.phone}</Text>
             )}
             <View style={{ marginTop: 10 }}>
-              <Badge
-                tone={params.type === "client" ? (entity.service_type === "security" ? "info" : "success") : (entity.role === "security" ? "info" : "success")}
-                label={params.type === "client"
-                  ? (entity.service_type === "security" ? t("security_short") : t("cleaning"))
-                  : (entity.role === "security" ? t("security_short") : t("cleaning"))}
-              />
+              <Badge tone={isSecurity ? "info" : "success"} label={serviceLabel} />
             </View>
             <View style={styles.balanceWrap}>
               <Text style={styles.balanceLabel}>{t("current_balance")}</Text>
@@ -164,6 +194,7 @@ const useStyles = makeStyles((c) => ({
   balanceValue: { fontSize: 24, fontWeight: "800", marginTop: 4 },
   section: { color: c.onSurface, fontSize: 17, fontWeight: "700" },
   addBtn: { backgroundColor: c.brandPrimary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 },
+  shareBtn: { minHeight: 44, minWidth: 44, justifyContent: "center", alignItems: "center", paddingHorizontal: 4 },
   txnRow: { flexDirection: "row", alignItems: "center", backgroundColor: c.surfaceSecondary, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: c.border },
   txnDesc: { color: c.onSurface, fontSize: 14, fontWeight: "600" },
   txnDate: { color: c.muted, fontSize: 11, marginTop: 2 },

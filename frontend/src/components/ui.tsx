@@ -370,9 +370,9 @@ export function ScreenHeader({ title, right, left }: { title: string; right?: Re
   const styles = useHeaderStyles();
   return (
     <View style={styles.wrap}>
-      <View style={{ width: 40, alignItems: "flex-start" }}>{left}</View>
-      <Text style={styles.title} numberOfLines={1}>{title}</Text>
-      <View style={{ width: 40, alignItems: "flex-end" }}>{right}</View>
+      <View style={{ minWidth: 40, alignItems: "flex-start" }}>{left}</View>
+      <Text style={[styles.title, { flex: 1 }]} numberOfLines={1}>{title}</Text>
+      <View style={{ minWidth: 40, alignItems: "flex-end" }}>{right}</View>
     </View>
   );
 }
