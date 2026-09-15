@@ -1,0 +1,6 @@
+{
+  "name": "Office Services Manager",
+  "description": "Security and cleaning services office management command center with client contracts, employee records, transactions, statements, and reports in Arabic RTL and English.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
