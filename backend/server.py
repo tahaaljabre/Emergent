@@ -17,9 +17,15 @@ from datetime import datetime, timezone, timedelta
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-mongo_url = os.environ["MONGO_URL"]
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ["DB_NAME"]]
+mongo_url = os.environ.get("MONGO_URL", "")
+db_name = os.environ.get("DB_NAME", "office_services")
+
+if not mongo_url or mongo_url.startswith("mongodb://localhost"):
+    from mongomock_motor import AsyncMongoMockClient
+    client = AsyncMongoMockClient()
+else:
+    client = AsyncIOMotorClient(mongo_url)
+db = client[db_name]
 
 # ---------- Emergent Object Storage ----------
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
@@ -29,12 +35,15 @@ APP_NAME = "office-services-manager"
 _storage_key: Optional[str] = None
 
 
+_local_store: dict = {}
+
+
 def init_storage():
     global _storage_key
     if _storage_key:
         return _storage_key
-    if not EMERGENT_KEY:
-        raise RuntimeError("EMERGENT_LLM_KEY missing")
+    if not EMERGENT_KEY or EMERGENT_KEY == "placeholder":
+        return "local"
     r = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
     r.raise_for_status()
     _storage_key = r.json()["storage_key"]
@@ -44,10 +53,16 @@ def init_storage():
 def put_object(path: str, data: bytes, content_type: str) -> dict:
     global _storage_key
     key = init_storage()
+    if key == "local":
+        _local_store[path] = (data, content_type)
+        return {"path": path}
     r = requests.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key, "Content-Type": content_type}, data=data, timeout=120)
     if r.status_code == 503:
         _storage_key = None
         key = init_storage()
+        if key == "local":
+            _local_store[path] = (data, content_type)
+            return {"path": path}
         r = requests.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key, "Content-Type": content_type}, data=data, timeout=120)
     r.raise_for_status()
     return r.json()
@@ -56,10 +71,18 @@ def put_object(path: str, data: bytes, content_type: str) -> dict:
 def get_object(path: str):
     global _storage_key
     key = init_storage()
+    if key == "local":
+        if path in _local_store:
+            return _local_store[path]
+        raise FileNotFoundError(path)
     r = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
     if r.status_code == 503:
         _storage_key = None
         key = init_storage()
+        if key == "local":
+            if path in _local_store:
+                return _local_store[path]
+            raise FileNotFoundError(path)
         r = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
     r.raise_for_status()
     return r.content, r.headers.get("Content-Type", "application/octet-stream")
