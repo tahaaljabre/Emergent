@@ -5,8 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useTheme, makeStyles } from "@/src/theme";
 import { useLang } from "@/src/i18n";
-import { createEmployee, getEmployee, updateEmployee, type ServiceType } from "@/src/api";
-import { Field, PrimaryButton, ScreenHeader } from "@/src/components/ui";
+import { createEmployee, getEmployee, updateEmployee, listClients, type ServiceType } from "@/src/api";
+import { Field, PrimaryButton, ScreenHeader, SelectField } from "@/src/components/ui";
 
 export default function EmployeeForm() {
   const insets = useSafeAreaInsets();
@@ -25,6 +25,7 @@ export default function EmployeeForm() {
     phone: "",
     salary: "",
   });
+  const [customAssignment, setCustomAssignment] = useState("");
 
   const q = useQuery({
     queryKey: ["employee", params.id],
@@ -36,6 +37,12 @@ export default function EmployeeForm() {
       setForm({ name: q.data.name, role: q.data.role, assignment: q.data.assignment, phone: q.data.phone, salary: String(q.data.salary || "") });
     }
   }, [q.data]);
+
+  // Fetch clients matching the currently selected role so the picker only offers relevant sites
+  const clientsQ = useQuery({
+    queryKey: ["clients-for-picker", form.role],
+    queryFn: () => listClients({ service: form.role, archived: false }),
+  });
 
   const mut = useMutation({
     mutationFn: async () => {
@@ -54,6 +61,12 @@ export default function EmployeeForm() {
     },
   });
 
+  const clientOptions = (clientsQ.data ?? []).map((c) => ({
+    label: c.name,
+    value: c.name,
+    sub: c.address || c.phone,
+  }));
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, backgroundColor: colors.surface }}>
       <View style={{ paddingTop: insets.top }}>
@@ -68,16 +81,38 @@ export default function EmployeeForm() {
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
-          <Pressable testID="role-cleaning" onPress={() => setForm({ ...form, role: "cleaning" })} style={[styles.seg, form.role === "cleaning" && styles.segActive]}>
+          <Pressable
+            testID="role-cleaning"
+            onPress={() => setForm({ ...form, role: "cleaning", assignment: "" })}
+            style={[styles.seg, form.role === "cleaning" && styles.segActive]}
+          >
             <Text style={[styles.segText, form.role === "cleaning" && styles.segTextActive]}>{t("cleaning")}</Text>
           </Pressable>
-          <Pressable testID="role-security" onPress={() => setForm({ ...form, role: "security" })} style={[styles.seg, form.role === "security" && styles.segActive]}>
+          <Pressable
+            testID="role-security"
+            onPress={() => setForm({ ...form, role: "security", assignment: "" })}
+            style={[styles.seg, form.role === "security" && styles.segActive]}
+          >
             <Text style={[styles.segText, form.role === "security" && styles.segTextActive]}>{t("security")}</Text>
           </Pressable>
         </View>
 
         <Field label={t("employee_name")} value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} testID="emp-input-name" />
-        <Field label={t("assignment")} value={form.assignment} onChangeText={(v) => setForm({ ...form, assignment: v })} testID="emp-input-assignment" />
+
+        <SelectField
+          label={t("assignment")}
+          value={form.assignment}
+          placeholder={t("select_client")}
+          options={clientOptions}
+          onSelect={(v) => setForm({ ...form, assignment: v })}
+          testID="emp-input-assignment"
+          allowCustom={{
+            customValue: customAssignment,
+            onChangeCustom: setCustomAssignment,
+            customLabel: t("manual_entry"),
+          }}
+        />
+
         <Field label={t("phone")} value={form.phone} onChangeText={(v) => setForm({ ...form, phone: v })} keyboardType="phone-pad" testID="emp-input-phone" />
         <Field label={t("salary")} value={form.salary} onChangeText={(v) => setForm({ ...form, salary: v })} keyboardType="numeric" testID="emp-input-salary" />
 

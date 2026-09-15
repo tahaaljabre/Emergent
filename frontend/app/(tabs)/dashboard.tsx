@@ -1,11 +1,11 @@
 import React from "react";
-import { View, Text, ScrollView, RefreshControl, Pressable } from "react-native";
+import { View, Text, ScrollView, RefreshControl, Pressable, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useTheme, makeStyles } from "@/src/theme";
 import { useLang } from "@/src/i18n";
-import { getDashboard, getSettings } from "@/src/api";
+import { getDashboard, getSettings, logoDisplayUrl } from "@/src/api";
 import { Badge, EmptyState } from "@/src/components/ui";
 
 export default function Dashboard() {
@@ -30,9 +30,18 @@ export default function Dashboard() {
         contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: 24, paddingHorizontal: 16 }}
         refreshControl={<RefreshControl refreshing={dashQ.isFetching} onRefresh={() => dashQ.refetch()} tintColor={colors.brandPrimary} />}
       >
-        <View style={{ marginBottom: 16 }}>
-          <Text style={[styles.hello, { writingDirection: isRTL ? "rtl" : "ltr" }]}>{settingsQ.data?.office_name ?? ""}</Text>
-          <Text style={styles.pageTitle}>{t("dashboard")}</Text>
+        <View style={{ marginBottom: 16, flexDirection: "row", alignItems: "center", gap: 12 }}>
+          {logoDisplayUrl(settingsQ.data?.logo_url) ? (
+            <Image source={{ uri: logoDisplayUrl(settingsQ.data?.logo_url)! }} style={{ width: 44, height: 44, borderRadius: 12 }} />
+          ) : (
+            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: colors.brandTertiary, alignItems: "center", justifyContent: "center" }}>
+              <Text style={{ fontSize: 22 }}>🏢</Text>
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.hello, { writingDirection: isRTL ? "rtl" : "ltr" }]}>{settingsQ.data?.office_name ?? ""}</Text>
+            <Text style={styles.pageTitle}>{t("dashboard")}</Text>
+          </View>
         </View>
 
         <View style={styles.kpiRow}>

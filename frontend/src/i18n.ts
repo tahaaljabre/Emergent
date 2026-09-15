@@ -111,6 +111,9 @@ const dict: Record<Lang, Record<string, string>> = {
     required_field: "هذا الحقل مطلوب",
     contract_expires_in: "ينتهي خلال",
     days: "يوم",
+    select_client: "اختر العميل",
+    no_clients_for_role: "لا يوجد عملاء متاحون لهذا التخصص",
+    manual_entry: "إدخال يدوي",
   },
   en: {
     dashboard: "Dashboard",
@@ -204,6 +207,9 @@ const dict: Record<Lang, Record<string, string>> = {
     required_field: "This field is required",
     contract_expires_in: "Expires in",
     days: "days",
+    select_client: "Select client",
+    no_clients_for_role: "No clients available for this role",
+    manual_entry: "Custom entry",
   },
 };
 

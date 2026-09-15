@@ -1,4 +1,4 @@
-import { View, Text, Pressable, StyleSheet, TextInput, Modal } from "react-native";
+import { View, Text, Pressable, StyleSheet, TextInput, Modal, ScrollView } from "react-native";
 import React from "react";
 import { useTheme, makeStyles } from "../theme";
 import { useLang } from "../i18n";
@@ -160,6 +160,126 @@ export function ConfirmSheet({
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+export function SelectField({
+  label,
+  value,
+  placeholder,
+  options,
+  onSelect,
+  testID,
+  allowCustom,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  options: { label: string; value: string; sub?: string }[];
+  onSelect: (v: string) => void;
+  testID?: string;
+  allowCustom?: { customValue: string; onChangeCustom: (v: string) => void; customLabel: string };
+}) {
+  const { colors } = useTheme();
+  const { isRTL } = useLang();
+  const [open, setOpen] = React.useState(false);
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={{ color: colors.onSurfaceSecondary, fontSize: 13, fontWeight: "600", marginBottom: 6, writingDirection: isRTL ? "rtl" : "ltr" }}>{label}</Text>
+      <Pressable
+        testID={testID}
+        onPress={() => setOpen(true)}
+        style={{
+          backgroundColor: colors.surfaceTertiary,
+          borderRadius: 12,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Text style={{ color: value ? colors.onSurface : colors.muted, fontSize: 15, flex: 1, textAlign: isRTL ? "right" : "left" }} numberOfLines={1}>
+          {value || placeholder}
+        </Text>
+        <Text style={{ color: colors.muted, fontSize: 14, marginStart: 8 }}>▾</Text>
+      </Pressable>
+
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={{ backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 34, maxHeight: "75%" }}
+          >
+            <View style={{ width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: "center", marginBottom: 12 }} />
+            <Text style={{ color: colors.onSurface, fontSize: 16, fontWeight: "700", textAlign: "center", marginBottom: 12 }}>{label}</Text>
+            <ScrollView style={{ maxHeight: 400 }}>
+              {options.length === 0 ? (
+                <Text testID="select-empty" style={{ color: colors.muted, textAlign: "center", padding: 20 }}>—</Text>
+              ) : (
+                options.map((o) => {
+                  const selected = o.value === value;
+                  return (
+                    <Pressable
+                      key={o.value}
+                      testID={`select-opt-${o.value}`}
+                      onPress={() => {
+                        onSelect(o.value);
+                        setOpen(false);
+                      }}
+                      style={{
+                        padding: 14,
+                        borderRadius: 12,
+                        marginBottom: 6,
+                        backgroundColor: selected ? colors.brandTertiary : colors.surfaceSecondary,
+                        borderWidth: 1,
+                        borderColor: selected ? colors.brandPrimary : colors.border,
+                      }}
+                    >
+                      <Text style={{ color: selected ? colors.onBrandTertiary : colors.onSurface, fontWeight: "600", fontSize: 14 }}>{o.label}</Text>
+                      {o.sub ? <Text style={{ color: colors.muted, fontSize: 12, marginTop: 2 }}>{o.sub}</Text> : null}
+                    </Pressable>
+                  );
+                })
+              )}
+              {allowCustom ? (
+                <View style={{ marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: colors.surfaceTertiary, borderWidth: 1, borderColor: colors.border }}>
+                  <Text style={{ color: colors.muted, fontSize: 12, marginBottom: 6 }}>{allowCustom.customLabel}</Text>
+                  <TextInput
+                    testID="select-custom-input"
+                    value={allowCustom.customValue}
+                    onChangeText={allowCustom.onChangeCustom}
+                    placeholderTextColor={colors.muted}
+                    style={{
+                      backgroundColor: colors.surface,
+                      color: colors.onSurface,
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      textAlign: isRTL ? "right" : "left",
+                    }}
+                  />
+                  <Pressable
+                    testID="select-custom-confirm"
+                    onPress={() => {
+                      onSelect(allowCustom.customValue);
+                      setOpen(false);
+                    }}
+                    style={{ marginTop: 8, backgroundColor: colors.brandPrimary, padding: 10, borderRadius: 10, alignItems: "center" }}
+                  >
+                    <Text style={{ color: colors.onBrandPrimary, fontWeight: "700" }}>OK</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
   );
 }
 

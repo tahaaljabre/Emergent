@@ -9,14 +9,18 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.mobileappbuilder.s9jfkz"
+      "bundleIdentifier": "com.emergent.mobileappbuilder.s9jfkz",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "اختر شعار المكتب من صورك"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.emergent.mobileappbuilder.s9jfkz"
+      "package": "com.emergent.mobileappbuilder.s9jfkz",
+      "permissions": ["READ_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES"]
     },
     "web": {
       "bundler": "metro",

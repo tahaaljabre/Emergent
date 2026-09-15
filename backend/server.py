@@ -1,9 +1,12 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File, Response
+from fastapi.concurrency import run_in_threadpool
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import uuid as uuidlib
+import requests
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
@@ -17,6 +20,49 @@ load_dotenv(ROOT_DIR / ".env")
 mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
+
+# ---------- Emergent Object Storage ----------
+STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
+STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
+APP_NAME = "office-services-manager"
+_storage_key: Optional[str] = None
+
+
+def init_storage():
+    global _storage_key
+    if _storage_key:
+        return _storage_key
+    if not EMERGENT_KEY:
+        raise RuntimeError("EMERGENT_LLM_KEY missing")
+    r = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
+    r.raise_for_status()
+    _storage_key = r.json()["storage_key"]
+    return _storage_key
+
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    global _storage_key
+    key = init_storage()
+    r = requests.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key, "Content-Type": content_type}, data=data, timeout=120)
+    if r.status_code == 503:
+        _storage_key = None
+        key = init_storage()
+        r = requests.put(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key, "Content-Type": content_type}, data=data, timeout=120)
+    r.raise_for_status()
+    return r.json()
+
+
+def get_object(path: str):
+    global _storage_key
+    key = init_storage()
+    r = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    if r.status_code == 503:
+        _storage_key = None
+        key = init_storage()
+        r = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    r.raise_for_status()
+    return r.content, r.headers.get("Content-Type", "application/octet-stream")
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -350,6 +396,30 @@ async def backup():
         "transactions": transactions,
         "settings": settings,
     }
+
+
+# ---------- Logo upload/serve ----------
+@api_router.post("/upload/logo")
+async def upload_logo(file: UploadFile = File(...)):
+    data = await file.read()
+    ext = (file.filename or "logo.png").rsplit(".", 1)[-1].lower() or "png"
+    obj_path = f"{APP_NAME}/uploads/office/{uuidlib.uuid4().hex}.{ext}"
+    ct = file.content_type or f"image/{ext}"
+    try:
+        await run_in_threadpool(put_object, obj_path, data, ct)
+    except Exception as e:
+        raise HTTPException(500, f"Upload failed: {e}")
+    await db.settings.update_one({"_id": "office"}, {"$set": {"logo_url": obj_path}}, upsert=True)
+    return {"logo_url": obj_path}
+
+
+@api_router.get("/files/{path:path}")
+async def get_file(path: str):
+    try:
+        content, ctype = await run_in_threadpool(get_object, path)
+    except Exception:
+        raise HTTPException(404, "File not found")
+    return Response(content=content, media_type=ctype)
 
 
 # ---------- Health ----------

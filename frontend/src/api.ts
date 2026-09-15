@@ -119,3 +119,21 @@ export const updateSettings = (data: Partial<OfficeSettings>) =>
 
 // Backup
 export const getBackup = () => req<any>(`/backup`);
+
+// Logo
+export const uploadLogo = async (fileUri: string, name: string, type: string): Promise<{ logo_url: string }> => {
+  const { Platform } = await import("react-native");
+  const form = new FormData();
+  if (Platform.OS === "web") {
+    const blob = await (await fetch(fileUri)).blob();
+    form.append("file", blob, name);
+  } else {
+    form.append("file", { uri: fileUri, name, type } as any);
+  }
+  const r = await fetch(`${BASE}/api/upload/logo`, { method: "POST", body: form });
+  if (!r.ok) throw new Error(`Upload failed: ${r.status}`);
+  return r.json();
+};
+
+export const logoDisplayUrl = (path: string | null | undefined) =>
+  path ? `${BASE}/api/files/${path}` : null;
